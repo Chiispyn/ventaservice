@@ -34,7 +34,6 @@ public class ProductoService {
         if (optionalProducto.isPresent()) {
             Producto existingProducto = optionalProducto.get();
             existingProducto.setNombre(productoDetails.getNombre());
-            existingProducto.setDescripcion(productoDetails.getDescripcion());
             existingProducto.setPrecio(productoDetails.getPrecio());
             return Optional.of(productoRepository.save(existingProducto));
         }

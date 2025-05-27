@@ -32,7 +32,7 @@ public class Venta {
     @Column(nullable = false)
     private MedioEnvio medioEnvio;
 
-    private String direccionDespacho;
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

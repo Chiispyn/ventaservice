@@ -57,11 +57,8 @@ public class VentaService {
             existingVenta.setFechaVenta(ventaDetails.getFechaVenta());
             existingVenta.setMontoTotal(ventaDetails.getMontoTotal());
             existingVenta.setMedioEnvio(ventaDetails.getMedioEnvio());
-            existingVenta.setDireccionDespacho(ventaDetails.getDireccionDespacho());
             existingVenta.setEstado(ventaDetails.getEstado());
 
-            // Para actualizar los detalles, necesitaríamos una lógica más compleja
-            // (comparar, añadir, eliminar detalles existentes). Por ahora, omitimos esto.
 
             return Optional.of(ventaRepository.save(existingVenta));
         }
