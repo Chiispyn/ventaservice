@@ -1,6 +1,7 @@
 package com.venta.ventas.model;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.venta.ventas.enums.MedioEnvio;
 import com.venta.ventas.enums.EstadoVenta;
 import jakarta.persistence.*;
@@ -32,15 +33,18 @@ public class Venta {
     @Column(nullable = false)
     private MedioEnvio medioEnvio;
 
-
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EstadoVenta estado;
 
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference // Añadimos esta anotación
+    @JsonManagedReference
     private List<DetalleVenta> detalles;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_id", nullable = false)
+    @JsonBackReference
+    private Cliente cliente;
 
     @PrePersist
     public void prePersist() {

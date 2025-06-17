@@ -16,7 +16,7 @@ public class Factura {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long codFactura; // Cambiamos a Long para la convención de JPA
+    private Long codFactura; 
 
     @Column(nullable = false)
     private LocalDateTime fechaEmision;
@@ -28,5 +28,5 @@ public class Factura {
     @JoinColumn(name = "venta_id", unique = true)
     private Venta venta;
 
-    // Podría haber más campos como detalles de pago, información del cliente, etc.
+   
 }

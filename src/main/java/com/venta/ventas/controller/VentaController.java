@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/ventas")
+@RequestMapping("/api/v1/ventas")
 public class VentaController {
 
     @Autowired
@@ -30,9 +30,13 @@ public class VentaController {
     }
 
     @PostMapping
-    public ResponseEntity<Venta> createVenta(@RequestBody Venta venta) {
-        Venta savedVenta = ventaService.save(venta);
-        return new ResponseEntity<>(savedVenta, HttpStatus.CREATED);
+    public ResponseEntity<Venta> createVenta(@RequestBody Venta venta, @RequestParam Long clienteId) {
+        try {
+            Venta savedVenta = ventaService.save(venta, clienteId);
+            return new ResponseEntity<>(savedVenta, HttpStatus.CREATED);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
     }
 
     @PutMapping("/{id}")
