@@ -1,10 +1,13 @@
 package com.venta.ventas.service;
 
+import com.venta.ventas.enums.EstadoVenta;
+import com.venta.ventas.enums.MedioEnvio;
 import com.venta.ventas.model.Factura;
 import com.venta.ventas.model.Venta;
 import com.venta.ventas.repository.FacturaRepository;
 import com.venta.ventas.repository.VentaRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,8 +20,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,193 +34,165 @@ public class FacturaServiceTest {
     @InjectMocks
     private FacturaService facturaService;
 
-    private Factura factura1;
-    private Factura factura2;
-    private Venta venta1;
+    private Factura factura;
+    private Venta venta;
+
     @BeforeEach
     void setUp() {
-        venta1 = new Venta();
-        venta1.setId(1L);
-        venta1.setMontoTotal(100.0);
-        venta1.setFechaVenta(LocalDateTime.now());
-
-        factura1 = new Factura();
-        factura1.setCodFactura(1L); 
-        factura1.setFechaEmision(LocalDateTime.now());
-        factura1.setTotalFactura(100.0);
-        factura1.setVenta(venta1);
-
-        factura2 = new Factura();
-        factura2.setCodFactura(2L); 
-        factura2.setFechaEmision(LocalDateTime.now().plusDays(1));
-        factura2.setTotalFactura(200.0);
-        factura2.setVenta(new Venta());
-}
+        venta = new Venta(1L, LocalDateTime.now(), 250.0, MedioEnvio.DESPACHO_A_DOMICILIO, EstadoVenta.COMPLETADA, null, null);
+        factura = new Factura(1L, LocalDateTime.now(), 250.0, venta);
+    }
 
     @Test
+    @DisplayName("findAll - Debe retornar todas las facturas existentes")
     void findAll_shouldReturnAllFacturas() {
-        // Arrange
-        List<Factura> expectedFacturas = Arrays.asList(factura1, factura2);
-        when(facturaRepository.findAll()).thenReturn(expectedFacturas);
+        when(facturaRepository.findAll()).thenReturn(Arrays.asList(factura));
 
-        // Act
-        List<Factura> actualFacturas = facturaService.findAll();
+        List<Factura> facturas = facturaService.findAll();
 
-        // Assert
-        assertNotNull(actualFacturas);
-        assertEquals(2, actualFacturas.size());
-        assertEquals(expectedFacturas, actualFacturas);
+        assertNotNull(facturas);
+        assertFalse(facturas.isEmpty());
+        assertEquals(1, facturas.size());
+        assertEquals(factura.getCodFactura(), facturas.get(0).getCodFactura());
         verify(facturaRepository, times(1)).findAll();
     }
 
     @Test
-    void findById_shouldReturnFacturaWhenFound() {
-        // Arrange
-        when(facturaRepository.findById(1L)).thenReturn(Optional.of(factura1));
+    @DisplayName("findById - Debe retornar una factura específica por su ID")
+    void findById_shouldReturnFacturaById() {
+        when(facturaRepository.findById(1L)).thenReturn(Optional.of(factura));
 
-        // Act
-        Optional<Factura> actualFactura = facturaService.findById(1L);
+        Optional<Factura> foundFactura = facturaService.findById(1L);
 
-        // Assert
-        assertTrue(actualFactura.isPresent());
-        assertEquals(factura1, actualFactura.get());
+        assertTrue(foundFactura.isPresent());
+        assertEquals(factura.getCodFactura(), foundFactura.get().getCodFactura());
         verify(facturaRepository, times(1)).findById(1L);
     }
 
     @Test
-    void findById_shouldReturnEmptyWhenNotFound() {
-        // Arrange
-        when(facturaRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("findById - Debe retornar un Optional vacío si la factura no se encuentra por ID")
+    void findById_shouldReturnEmptyIfFacturaNotFound() {
+        when(facturaRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Act
-        Optional<Factura> actualFactura = facturaService.findById(99L);
+        Optional<Factura> foundFactura = facturaService.findById(99L);
 
-        // Assert
-        assertFalse(actualFactura.isPresent());
+        assertTrue(foundFactura.isEmpty());
         verify(facturaRepository, times(1)).findById(99L);
     }
 
     @Test
-    void findByVentaId_shouldReturnFacturaWhenFound() {
-        // Arrange
-        when(facturaRepository.findByVenta_Id(1L)).thenReturn(Optional.of(factura1));
+    @DisplayName("findByVentaId - Debe retornar una factura por el ID de la venta asociada")
+    void findByVentaId_shouldReturnFacturaByVentaId() {
+        when(facturaRepository.findByVenta_Id(1L)).thenReturn(Optional.of(factura));
 
-        // Act
-        Optional<Factura> actualFactura = facturaService.findByVentaId(1L);
+        Optional<Factura> foundFactura = facturaService.findByVentaId(1L);
 
-        // Assert
-        assertTrue(actualFactura.isPresent());
-        assertEquals(factura1, actualFactura.get());
+        assertTrue(foundFactura.isPresent());
+        assertEquals(factura.getCodFactura(), foundFactura.get().getCodFactura());
+        assertEquals(venta.getId(), foundFactura.get().getVenta().getId());
         verify(facturaRepository, times(1)).findByVenta_Id(1L);
     }
 
     @Test
-    void findByVentaId_shouldReturnEmptyWhenNotFound() {
-        // Arrange
-        when(facturaRepository.findByVenta_Id(99L)).thenReturn(Optional.empty());
+    @DisplayName("findByVentaId - Debe retornar Optional vacío si no hay factura para el ID de venta")
+    void findByVentaId_shouldReturnEmptyIfNoFacturaForVentaId() {
+        when(facturaRepository.findByVenta_Id(anyLong())).thenReturn(Optional.empty());
 
-        // Act
-        Optional<Factura> actualFactura = facturaService.findByVentaId(99L);
+        Optional<Factura> foundFactura = facturaService.findByVentaId(99L);
 
-        // Assert
-        assertFalse(actualFactura.isPresent());
+        assertTrue(foundFactura.isEmpty());
         verify(facturaRepository, times(1)).findByVenta_Id(99L);
     }
 
+
     @Test
-    void emitirFactura_shouldCreateFacturaWhenVentaExists() {
-        // Arrange
-        when(ventaRepository.findById(1L)).thenReturn(Optional.of(venta1));
-        when(facturaRepository.save(any(Factura.class))).thenReturn(factura1);
+    @DisplayName("emitirFactura - Debe crear y guardar una nueva factura para una venta existente")
+    void emitirFactura_shouldCreateAndSaveFactura() {
+        when(ventaRepository.findById(1L)).thenReturn(Optional.of(venta));
+        when(facturaRepository.save(any(Factura.class))).thenAnswer(invocation -> {
+            Factura savedFactura = invocation.getArgument(0);
+            savedFactura.setCodFactura(2L); // Simular asignación de ID
+            return savedFactura;
+        });
 
-        // Act
-        Factura createdFactura = facturaService.emitirFactura(1L);
+        Factura emittedFactura = facturaService.emitirFactura(1L);
 
-        // Assert
-        assertNotNull(createdFactura);
-        assertEquals(venta1.getMontoTotal(), createdFactura.getTotalFactura());
-        assertEquals(venta1, createdFactura.getVenta());
-        assertNotNull(createdFactura.getFechaEmision());
+        assertNotNull(emittedFactura);
+        assertEquals(2L, emittedFactura.getCodFactura());
+        assertEquals(venta.getMontoTotal(), emittedFactura.getTotalFactura());
+        assertEquals(venta, emittedFactura.getVenta());
+        assertNotNull(emittedFactura.getFechaEmision());
+
         verify(ventaRepository, times(1)).findById(1L);
         verify(facturaRepository, times(1)).save(any(Factura.class));
     }
 
     @Test
-    void emitirFactura_shouldReturnNullWhenVentaDoesNotExist() {
-        // Arrange
-        when(ventaRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("emitirFactura - Debe retornar null si la venta no se encuentra al emitir factura")
+    void emitirFactura_shouldReturnNullIfVentaNotFound() {
+        when(ventaRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Act
-        Factura createdFactura = facturaService.emitirFactura(99L);
+        Factura emittedFactura = facturaService.emitirFactura(99L);
 
-        // Assert
-        assertNull(createdFactura);
+        assertNull(emittedFactura);
         verify(ventaRepository, times(1)).findById(99L);
         verify(facturaRepository, never()).save(any(Factura.class));
     }
 
     @Test
-    void update_shouldUpdateFacturaWhenFound() {
-        // Arrange
-        Factura updatedDetails = new Factura();
-        updatedDetails.setFechaEmision(LocalDateTime.now().plusDays(5));
-        updatedDetails.setTotalFactura(300.0);
-        updatedDetails.setVenta(new Venta()); // Simular una venta diferente si es necesario
+    @DisplayName("update - Debe actualizar una factura existente")
+    void update_shouldUpdateExistingFactura() {
+        // La factura original tiene un ID, la updatedDetails simula el cuerpo de la petición
+        Factura updatedDetails = new Factura(null, LocalDateTime.now().plusDays(1), 300.0, venta);
+        
+        when(facturaRepository.findById(1L)).thenReturn(Optional.of(factura));
+        when(facturaRepository.save(any(Factura.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        when(facturaRepository.findById(1L)).thenReturn(Optional.of(factura1));
-        when(facturaRepository.save(any(Factura.class))).thenReturn(updatedDetails); // Retornar los detalles actualizados
+        Optional<Factura> result = facturaService.update(1L, updatedDetails);
 
-        // Act
-        Optional<Factura> actualFactura = facturaService.update(1L, updatedDetails);
+        assertTrue(result.isPresent());
+        assertEquals(updatedDetails.getFechaEmision(), result.get().getFechaEmision());
+        assertEquals(updatedDetails.getTotalFactura(), result.get().getTotalFactura());
+        assertEquals(updatedDetails.getVenta(), result.get().getVenta()); // La venta asociada también puede ser actualizada
 
-        // Assert
-        assertTrue(actualFactura.isPresent());
-        assertEquals(updatedDetails.getFechaEmision(), actualFactura.get().getFechaEmision());
-        assertEquals(updatedDetails.getTotalFactura(), actualFactura.get().getTotalFactura());
         verify(facturaRepository, times(1)).findById(1L);
         verify(facturaRepository, times(1)).save(any(Factura.class));
     }
 
     @Test
-    void update_shouldReturnEmptyWhenFacturaNotFound() {
-        // Arrange
-        Factura updatedDetails = new Factura();
-        when(facturaRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("update - Debe retornar Optional vacío si la factura a actualizar no se encuentra")
+    void update_shouldReturnEmptyIfFacturaNotFound() {
+        when(facturaRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Act
-        Optional<Factura> actualFactura = facturaService.update(99L, updatedDetails);
+        Optional<Factura> result = facturaService.update(99L, new Factura());
 
-        // Assert
-        assertFalse(actualFactura.isPresent());
+        assertTrue(result.isEmpty());
+
         verify(facturaRepository, times(1)).findById(99L);
         verify(facturaRepository, never()).save(any(Factura.class));
     }
 
     @Test
-    void deleteById_shouldReturnTrueWhenFacturaExists() {
-        // Arrange
+    @DisplayName("deleteById - Debe eliminar una factura exitosamente por su ID")
+    void deleteById_shouldDeleteFacturaById() {
         when(facturaRepository.existsById(1L)).thenReturn(true);
         doNothing().when(facturaRepository).deleteById(1L);
 
-        // Act
-        boolean result = facturaService.deleteById(1L);
+        boolean deleted = facturaService.deleteById(1L);
 
-        // Assert
-        assertTrue(result);
+        assertTrue(deleted);
         verify(facturaRepository, times(1)).existsById(1L);
         verify(facturaRepository, times(1)).deleteById(1L);
     }
 
     @Test
-    void deleteById_shouldReturnFalseWhenFacturaDoesNotExist() {
-        // Arrange
-        when(facturaRepository.existsById(99L)).thenReturn(false);
+    @DisplayName("deleteById - Debe retornar falso si la factura a eliminar no existe")
+    void deleteById_shouldReturnFalseIfFacturaNotFound() {
+        when(facturaRepository.existsById(anyLong())).thenReturn(false);
 
-        // Act
-        boolean result = facturaService.deleteById(99L);
+        boolean deleted = facturaService.deleteById(99L);
 
-        // Assert
-        assertFalse(result);
+        assertFalse(deleted);
         verify(facturaRepository, times(1)).existsById(99L);
         verify(facturaRepository, never()).deleteById(anyLong());
     }

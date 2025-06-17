@@ -19,7 +19,7 @@ public class DetalleVenta {
 
     @ManyToOne
     @JoinColumn(name = "venta_id", nullable = false)
-    @JsonBackReference // Añadimos esta anotación
+    @JsonBackReference  // Añadimos esta anotación
     private Venta venta;
 
     @ManyToOne

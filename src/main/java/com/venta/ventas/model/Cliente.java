@@ -35,7 +35,7 @@ public class Cliente {
     private String telefono;
 
     
-    @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cliente")
     @JsonBackReference 
     private List<Venta> ventas;
 

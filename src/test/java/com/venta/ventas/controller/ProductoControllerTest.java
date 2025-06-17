@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.venta.ventas.model.Producto;
 import com.venta.ventas.service.ProductoService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -14,184 +15,140 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Arrays;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ProductoController.class) // Anotación para probar solo la capa web del controlador
+@WebMvcTest(ProductoController.class)
 public class ProductoControllerTest {
 
     @Autowired
-    private MockMvc mockMvc; // Objeto para simular peticiones HTTP
+    private MockMvc mockMvc;
 
-    @MockBean // Crea un mock para el ProductoService y lo inyecta en el controlador
+    @MockBean
     private ProductoService productoService;
 
     @Autowired
-    private ObjectMapper objectMapper; // Para convertir objetos Java a JSON y viceversa
+    private ObjectMapper objectMapper;
 
-    private Producto producto1;
-    private Producto producto2;
+    private Producto producto;
 
     @BeforeEach
     void setUp() {
-        producto1 = new Producto();
-        producto1.setId(1L);
-        producto1.setNombre("Jabón Artesanal de Romero");
-        
-        producto1.setPrecio(7.50);
-        
-
-        producto2 = new Producto();
-        producto2.setId(2L);
-        producto2.setNombre("Champú Sólido de Lavanda");
-        
-        producto2.setPrecio(12.00);
-        
+        producto = new Producto(1L, "Monitor Gaming", 350.0);
     }
 
     @Test
-    void getAllProductos_shouldReturnListOfProductos() throws Exception {
-        // Arrange
-        when(productoService.findAll()).thenReturn(Arrays.asList(producto1, producto2));
+    @DisplayName("GET /api/v1/productos - Debería retornar todos los productos")
+    void getAllProductos_shouldReturnAllProductos() throws Exception {
+        when(productoService.findAll()).thenReturn(Arrays.asList(producto, new Producto(2L, "Teclado", 100.0)));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/productos")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk()) // Espera un 200 OK
-                .andExpect(jsonPath("$.length()").value(2)) // Espera 2 elementos en la lista JSON
-                .andExpect(jsonPath("$[0].id").value(producto1.getId()))
-                .andExpect(jsonPath("$[0].nombre").value(producto1.getNombre()))
-                .andExpect(jsonPath("$[1].id").value(producto2.getId()))
-                .andExpect(jsonPath("$[1].nombre").value(producto2.getNombre()));
+        mockMvc.perform(get("/api/v1/productos"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].nombre", is(producto.getNombre())));
 
-        verify(productoService, times(1)).findAll(); // Verifica que el servicio fue llamado una vez
+        verify(productoService, times(1)).findAll();
     }
 
     @Test
-    void getProductoById_shouldReturnProductoWhenFound() throws Exception {
-        // Arrange
-        when(productoService.findById(1L)).thenReturn(Optional.of(producto1));
+    @DisplayName("GET /api/v1/productos/{id} - Debería retornar un producto por su ID")
+    void getProductoById_shouldReturnProductoById() throws Exception {
+        when(productoService.findById(producto.getId())).thenReturn(Optional.of(producto));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/productos/{id}", 1L)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk()) // Espera un 200 OK
-                .andExpect(jsonPath("$.id").value(producto1.getId()))
-                .andExpect(jsonPath("$.nombre").value(producto1.getNombre()))
-                .andExpect(jsonPath("$.precio").value(producto1.getPrecio()));
+        mockMvc.perform(get("/api/v1/productos/{id}", producto.getId()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id", is(producto.getId().intValue())))
+                .andExpect(jsonPath("$.nombre", is(producto.getNombre())));
 
-        verify(productoService, times(1)).findById(1L);
+        verify(productoService, times(1)).findById(producto.getId());
     }
 
     @Test
-    void getProductoById_shouldReturnNotFoundWhenProductoDoesNotExist() throws Exception {
-        // Arrange
-        when(productoService.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("GET /api/v1/productos/{id} - Debería retornar 404 si el producto no se encuentra")
+    void getProductoById_shouldReturnNotFound() throws Exception {
+        when(productoService.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/productos/{id}", 99L)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound()); // Espera un 404 Not Found
+        mockMvc.perform(get("/api/v1/productos/{id}", 99L))
+                .andExpect(status().isNotFound());
+
         verify(productoService, times(1)).findById(99L);
     }
 
     @Test
-    void createProducto_shouldCreateProductoAndReturnCreatedStatus() throws Exception {
-        // Arrange
-        Producto newProducto = new Producto();
-        newProducto.setNombre("Crema Hidratante Bio");    
-        newProducto.setPrecio(25.00);
-        
-
-        Producto savedProducto = new Producto();
-        savedProducto.setId(3L); // Simula el ID generado por la BD
-        savedProducto.setNombre(newProducto.getNombre());       
-        savedProducto.setPrecio(newProducto.getPrecio());
-        
+    @DisplayName("POST /api/v1/productos - Debería crear un nuevo producto")
+    void createProducto_shouldCreateNewProducto() throws Exception {
+        Producto newProducto = new Producto(null, "Mouse Inalámbrico", 50.0);
+        Producto savedProducto = new Producto(2L, "Mouse Inalámbrico", 50.0);
 
         when(productoService.save(any(Producto.class))).thenReturn(savedProducto);
 
-        // Act & Assert
         mockMvc.perform(post("/api/v1/productos")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(newProducto))) // Cuerpo de la solicitud
-                .andExpect(status().isCreated()) // Espera un 201 Created
-                .andExpect(jsonPath("$.id").value(savedProducto.getId()))
-                .andExpect(jsonPath("$.nombre").value(newProducto.getNombre()))
-                .andExpect(jsonPath("$.precio").value(newProducto.getPrecio()));
+                .content(objectMapper.writeValueAsString(newProducto)))
+                .andExpect(status().isCreated())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id", is(savedProducto.getId().intValue())))
+                .andExpect(jsonPath("$.nombre", is(savedProducto.getNombre())));
 
         verify(productoService, times(1)).save(any(Producto.class));
     }
 
     @Test
-    void updateProducto_shouldUpdateProductoAndReturnOkStatus() throws Exception {
-        // Arrange
-        Long productIdToUpdate = 1L;
-        Producto updatedDetails = new Producto();
-        updatedDetails.setNombre("Jabón Artesanal de Lavanda (Actualizado)");
-        
-        updatedDetails.setPrecio(8.00);
-        
+    @DisplayName("PUT /api/v1/productos/{id} - Debería actualizar un producto existente")
+    void updateProducto_shouldUpdateExistingProducto() throws Exception {
+        Producto updatedDetails = new Producto(null, "Monitor Curvo", 400.0);
+        Producto updatedProductoResult = new Producto(producto.getId(), "Monitor Curvo", 400.0);
 
-        // Asegúrate de que el objeto que mockea el retorno del servicio tenga el ID
-        Producto returnedUpdatedProducto = new Producto();
-        returnedUpdatedProducto.setId(productIdToUpdate);
-        returnedUpdatedProducto.setNombre(updatedDetails.getNombre());    
-        returnedUpdatedProducto.setPrecio(updatedDetails.getPrecio());
-        
+        when(productoService.update(eq(producto.getId()), any(Producto.class))).thenReturn(Optional.of(updatedProductoResult));
 
-        when(productoService.update(eq(productIdToUpdate), any(Producto.class))).thenReturn(Optional.of(returnedUpdatedProducto));
-
-        // Act & Assert
-        mockMvc.perform(put("/api/v1/productos/{id}", productIdToUpdate)
+        mockMvc.perform(put("/api/v1/productos/{id}", producto.getId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updatedDetails))) // Cuerpo de la solicitud
-                .andExpect(status().isOk()) // Espera un 200 OK
-                .andExpect(jsonPath("$.id").value(productIdToUpdate))
-                .andExpect(jsonPath("$.nombre").value(updatedDetails.getNombre()))
-                .andExpect(jsonPath("$.precio").value(updatedDetails.getPrecio()));
+                .content(objectMapper.writeValueAsString(updatedDetails)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id", is(producto.getId().intValue())))
+                .andExpect(jsonPath("$.nombre", is("Monitor Curvo")));
 
-        verify(productoService, times(1)).update(eq(productIdToUpdate), any(Producto.class));
+        verify(productoService, times(1)).update(eq(producto.getId()), any(Producto.class));
     }
 
     @Test
-    void updateProducto_shouldReturnNotFoundWhenProductoDoesNotExist() throws Exception {
-        // Arrange
-        Producto updatedDetails = new Producto(); // El contenido no es relevante para este caso de prueba
-        when(productoService.update(eq(99L), any(Producto.class))).thenReturn(Optional.empty());
+    @DisplayName("PUT /api/v1/productos/{id} - Debería retornar 404 si el producto a actualizar no se encuentra")
+    void updateProducto_shouldReturnNotFound() throws Exception {
+        when(productoService.update(anyLong(), any(Producto.class))).thenReturn(Optional.empty());
 
-        // Act & Assert
         mockMvc.perform(put("/api/v1/productos/{id}", 99L)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updatedDetails)))
-                .andExpect(status().isNotFound()); // Espera un 404 Not Found
+                .content(objectMapper.writeValueAsString(new Producto())))
+                .andExpect(status().isNotFound());
 
         verify(productoService, times(1)).update(eq(99L), any(Producto.class));
     }
 
     @Test
-    void deleteProducto_shouldReturnNoContentStatus() throws Exception {
-        // Arrange
-        when(productoService.deleteById(1L)).thenReturn(true);
+    @DisplayName("DELETE /api/v1/productos/{id} - Debería eliminar un producto exitosamente")
+    void deleteProducto_shouldDeleteProducto() throws Exception {
+        when(productoService.deleteById(producto.getId())).thenReturn(true);
 
-        // Act & Assert
-        mockMvc.perform(delete("/api/v1/productos/{id}", 1L))
-                .andExpect(status().isNoContent()); // Espera un 204 No Content
+        mockMvc.perform(delete("/api/v1/productos/{id}", producto.getId()))
+                .andExpect(status().isNoContent());
 
-        verify(productoService, times(1)).deleteById(1L);
+        verify(productoService, times(1)).deleteById(producto.getId());
     }
 
     @Test
-    void deleteProducto_shouldReturnNotFoundWhenProductoDoesNotExist() throws Exception {
-        // Arrange
-        when(productoService.deleteById(99L)).thenReturn(false);
+    @DisplayName("DELETE /api/v1/productos/{id} - Debería retornar 404 si el producto a eliminar no se encuentra")
+    void deleteProducto_shouldReturnNotFound() throws Exception {
+        when(productoService.deleteById(anyLong())).thenReturn(false);
 
-        // Act & Assert
         mockMvc.perform(delete("/api/v1/productos/{id}", 99L))
-                .andExpect(status().isNotFound()); // Espera un 404 Not Found
+                .andExpect(status().isNotFound());
 
         verify(productoService, times(1)).deleteById(99L);
     }

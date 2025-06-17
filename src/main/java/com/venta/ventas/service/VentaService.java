@@ -94,13 +94,23 @@ public class VentaService {
         Optional<Venta> optionalVenta = ventaRepository.findById(ventaId);
         if (optionalVenta.isPresent()) {
             Venta venta = optionalVenta.get();
+            // Si la venta está pendiente, aplica el descuento.
             if (venta.getEstado() == EstadoVenta.PENDIENTE) {
+                // Opcional: Validar el porcentaje de descuento aquí también, si no lo haces en otro lado.
+                // if (porcentajeDescuento < 0 || porcentajeDescuento > 100) {
+                //     throw new IllegalArgumentException("El porcentaje de descuento debe estar entre 0 y 100.");
+                // }
                 double montoOriginal = venta.getMontoTotal();
                 double montoConDescuento = montoOriginal * (1 - (porcentajeDescuento / 100.0));
                 venta.setMontoTotal(montoConDescuento);
                 return Optional.of(ventaRepository.save(venta));
+            } else {
+                // Si la venta no está en estado PENDIENTE, no se aplica el descuento,
+                // pero la venta fue encontrada, así que la retornamos sin modificar.
+                return Optional.of(venta); // <--- ESTE ES EL CAMBIO CLAVE
             }
         }
+        // Si la venta no se encontró por ID, retornamos Optional.empty().
         return Optional.empty();
     }
 

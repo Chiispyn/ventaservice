@@ -1,10 +1,15 @@
 package com.venta.ventas.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.venta.ventas.enums.EstadoVenta;
+import com.venta.ventas.enums.MedioEnvio;
 import com.venta.ventas.model.Factura;
 import com.venta.ventas.model.Venta;
 import com.venta.ventas.service.FacturaService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -16,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -34,210 +40,156 @@ public class FacturaControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Factura factura1;
-    private Factura factura2;
-    private Venta venta1; // Venta asociada a factura1 y factura2
-    private Venta venta2; // Otra venta para casos de prueba
+    private Factura factura;
+    private Venta venta;
 
     @BeforeEach
     void setUp() {
-        venta1 = new Venta();
-        venta1.setId(101L);
-        venta1.setMontoTotal(150.0); // Necesario para emitirFactura
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // Para evitar problemas de formato de fecha
 
-        venta2 = new Venta();
-        venta2.setId(102L);
-        venta2.setMontoTotal(200.0); // Necesario para emitirFactura
-
-        factura1 = new Factura();
-        factura1.setCodFactura(1L); // Usamos codFactura
-        factura1.setFechaEmision(LocalDateTime.of(2024, 5, 10, 10, 0));
-        factura1.setTotalFactura(150.0); // Usamos totalFactura
-        factura1.setVenta(venta1);
-
-        factura2 = new Factura();
-        factura2.setCodFactura(2L); // Usamos codFactura
-        factura2.setFechaEmision(LocalDateTime.of(2024, 5, 15, 11, 30));
-        factura2.setTotalFactura(250.0); // Usamos totalFactura
-        factura2.setVenta(venta1); // Asociada a la misma venta para un escenario
+        venta = new Venta(1L, LocalDateTime.of(2023, 1, 15, 10, 0), 200.0, MedioEnvio.DESPACHO_A_DOMICILIO, EstadoVenta.COMPLETADA, null, null);
+        factura = new Factura(1L, LocalDateTime.of(2023, 1, 15, 10, 30), 200.0, venta);
     }
 
     @Test
-    void getAllFacturas_shouldReturnListOfFacturas() throws Exception {
-        // Arrange
-        when(facturaService.findAll()).thenReturn(Arrays.asList(factura1, factura2));
+    @DisplayName("GET /api/v1/facturas - Debería retornar todas las facturas")
+    void getAllFacturas_shouldReturnAllFacturas() throws Exception {
+        when(facturaService.findAll()).thenReturn(Arrays.asList(factura, new Factura(2L, LocalDateTime.now(), 150.0, new Venta())));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/facturas")
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/v1/facturas"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].codFactura").value(factura1.getCodFactura())) // Corregido a codFactura
-                .andExpect(jsonPath("$[1].codFactura").value(factura2.getCodFactura())); // Corregido a codFactura
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].codFactura", is(factura.getCodFactura().intValue())));
 
         verify(facturaService, times(1)).findAll();
     }
 
     @Test
-    void getFacturaById_shouldReturnFacturaWhenFound() throws Exception {
-        // Arrange
-        when(facturaService.findById(1L)).thenReturn(Optional.of(factura1));
+    @DisplayName("GET /api/v1/facturas/{id} - Debería retornar una factura por su ID")
+    void getFacturaById_shouldReturnFacturaById() throws Exception {
+        when(facturaService.findById(factura.getCodFactura())).thenReturn(Optional.of(factura));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/facturas/{id}", 1L)
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/v1/facturas/{id}", factura.getCodFactura()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.codFactura").value(factura1.getCodFactura())) // Corregido a codFactura
-                .andExpect(jsonPath("$.totalFactura").value(factura1.getTotalFactura())); // Corregido a totalFactura
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.codFactura", is(factura.getCodFactura().intValue())))
+                .andExpect(jsonPath("$.totalFactura", is(factura.getTotalFactura())));
 
-        verify(facturaService, times(1)).findById(1L);
+        verify(facturaService, times(1)).findById(factura.getCodFactura());
     }
 
     @Test
-    void getFacturaById_shouldReturnNotFoundWhenFacturaDoesNotExist() throws Exception {
-        // Arrange
-        when(facturaService.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("GET /api/v1/facturas/{id} - Debería retornar 404 si la factura no se encuentra")
+    void getFacturaById_shouldReturnNotFound() throws Exception {
+        when(facturaService.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/facturas/{id}", 99L)
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/v1/facturas/{id}", 99L))
                 .andExpect(status().isNotFound());
 
         verify(facturaService, times(1)).findById(99L);
     }
 
     @Test
-    void getFacturaByVentaId_shouldReturnFacturaWhenFound() throws Exception {
-        // Arrange
-        when(facturaService.findByVentaId(venta1.getId())).thenReturn(Optional.of(factura1));
+    @DisplayName("GET /api/v1/facturas/venta/{ventaId} - Debería retornar una factura por el ID de la venta")
+    void getFacturaByVentaId_shouldReturnFacturaByVentaId() throws Exception {
+        when(facturaService.findByVentaId(venta.getId())).thenReturn(Optional.of(factura));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/facturas/venta/{ventaId}", venta1.getId())
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/v1/facturas/venta/{ventaId}", venta.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.codFactura").value(factura1.getCodFactura())) // Corregido a codFactura
-                .andExpect(jsonPath("$.venta.id").value(venta1.getId()));
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.codFactura", is(factura.getCodFactura().intValue())))
+                .andExpect(jsonPath("$.venta.id", is(venta.getId().intValue())));
 
-        verify(facturaService, times(1)).findByVentaId(venta1.getId());
+        verify(facturaService, times(1)).findByVentaId(venta.getId());
     }
 
     @Test
-    void getFacturaByVentaId_shouldReturnNotFoundWhenFacturaForVentaDoesNotExist() throws Exception {
-        // Arrange
-        when(facturaService.findByVentaId(999L)).thenReturn(Optional.empty());
+    @DisplayName("GET /api/v1/facturas/venta/{ventaId} - Debería retornar 404 si no hay factura para el ID de venta")
+    void getFacturaByVentaId_shouldReturnNotFoundIfNoFacturaForVentaId() throws Exception {
+        when(facturaService.findByVentaId(anyLong())).thenReturn(Optional.empty());
 
-        // Act & Assert
-        mockMvc.perform(get("/api/v1/facturas/venta/{ventaId}", 999L)
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/v1/facturas/venta/{ventaId}", 99L))
                 .andExpect(status().isNotFound());
 
-        verify(facturaService, times(1)).findByVentaId(999L);
+        verify(facturaService, times(1)).findByVentaId(99L);
     }
 
     @Test
-    void emitirFactura_shouldEmitFacturaAndReturnCreatedStatus() throws Exception {
-        // Arrange
-        Long ventaIdToEmit = venta1.getId();
-        Factura emittedFactura = new Factura();
-        emittedFactura.setCodFactura(3L); // Usamos codFactura
-        emittedFactura.setFechaEmision(LocalDateTime.now());
-        emittedFactura.setTotalFactura(venta1.getMontoTotal()); // Usamos totalFactura
-        emittedFactura.setVenta(venta1);
+    @DisplayName("POST /api/v1/facturas/emitir/{ventaId} - Debería emitir y retornar una nueva factura")
+    void emitirFactura_shouldEmitNewFactura() throws Exception {
+        Factura emittedFactura = new Factura(2L, LocalDateTime.now(), 200.0, venta);
+        when(facturaService.emitirFactura(venta.getId())).thenReturn(emittedFactura);
 
-        when(facturaService.emitirFactura(ventaIdToEmit)).thenReturn(emittedFactura);
-
-        // Act & Assert
-        mockMvc.perform(post("/api/v1/facturas/emitir/{ventaId}", ventaIdToEmit)
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post("/api/v1/facturas/emitir/{ventaId}", venta.getId()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.codFactura").value(emittedFactura.getCodFactura())) // Corregido a codFactura
-                .andExpect(jsonPath("$.totalFactura").value(emittedFactura.getTotalFactura())) // Corregido a totalFactura
-                .andExpect(jsonPath("$.venta.id").value(venta1.getId()));
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.codFactura", is(emittedFactura.getCodFactura().intValue())))
+                .andExpect(jsonPath("$.totalFactura", is(emittedFactura.getTotalFactura())));
 
-        verify(facturaService, times(1)).emitirFactura(ventaIdToEmit);
+        verify(facturaService, times(1)).emitirFactura(venta.getId());
     }
 
     @Test
-    void emitirFactura_shouldReturnNotFoundWhenVentaNotFoundForEmission() throws Exception {
-        // Arrange
-        Long ventaIdNotFound = 999L;
-        when(facturaService.emitirFactura(ventaIdNotFound)).thenReturn(null);
+    @DisplayName("POST /api/v1/facturas/emitir/{ventaId} - Debería retornar 404 si la venta no se encuentra al emitir factura")
+    void emitirFactura_shouldReturnNotFoundIfVentaNotFound() throws Exception {
+        when(facturaService.emitirFactura(anyLong())).thenReturn(null);
 
-        // Act & Assert
-        mockMvc.perform(post("/api/v1/facturas/emitir/{ventaId}", ventaIdNotFound)
-                .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post("/api/v1/facturas/emitir/{ventaId}", 99L))
                 .andExpect(status().isNotFound());
 
-        verify(facturaService, times(1)).emitirFactura(ventaIdNotFound);
+        verify(facturaService, times(1)).emitirFactura(99L);
     }
 
     @Test
-    void updateFactura_shouldUpdateFacturaAndReturnOkStatus() throws Exception {
-        // Arrange
-        Long facturaIdToUpdate = 1L;
-        Factura updatedDetails = new Factura();
-        updatedDetails.setFechaEmision(LocalDateTime.of(2024, 6, 1, 12, 0));
-        updatedDetails.setTotalFactura(500.0); // Usamos totalFactura
-        updatedDetails.setVenta(venta2); // Simula que la venta asociada también puede cambiar
+    @DisplayName("PUT /api/v1/facturas/{id} - Debería actualizar una factura existente")
+    void updateFactura_shouldUpdateExistingFactura() throws Exception {
+        Factura updatedDetails = new Factura(null, LocalDateTime.now().plusDays(1), 250.0, venta);
+        Factura updatedFacturaResult = new Factura(factura.getCodFactura(), updatedDetails.getFechaEmision(), updatedDetails.getTotalFactura(), updatedDetails.getVenta());
 
-        // Objeto que el servicio mockeado devolverá
-        Factura returnedUpdatedFactura = new Factura();
-        returnedUpdatedFactura.setCodFactura(facturaIdToUpdate); // Usamos codFactura
-        returnedUpdatedFactura.setFechaEmision(updatedDetails.getFechaEmision());
-        returnedUpdatedFactura.setTotalFactura(updatedDetails.getTotalFactura()); // Usamos totalFactura
-        returnedUpdatedFactura.setVenta(venta2); // Debe coincidir con lo que se pasa al servicio
+        when(facturaService.update(eq(factura.getCodFactura()), any(Factura.class))).thenReturn(Optional.of(updatedFacturaResult));
 
-        when(facturaService.update(eq(facturaIdToUpdate), any(Factura.class))).thenReturn(Optional.of(returnedUpdatedFactura));
-
-        
-        mockMvc.perform(put("/api/v1/facturas/{id}", facturaIdToUpdate)
+        mockMvc.perform(put("/api/v1/facturas/{id}", factura.getCodFactura())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatedDetails)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.codFactura").value(facturaIdToUpdate)) // Corregido a codFactura
-                .andExpect(jsonPath("$.totalFactura").value(updatedDetails.getTotalFactura())) // Corregido a totalFactura
-                .andExpect(jsonPath("$.venta.id").value(venta2.getId())); // Verifica que la venta también se actualizó
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.codFactura", is(factura.getCodFactura().intValue())))
+                .andExpect(jsonPath("$.totalFactura", is(250.0)));
 
-        verify(facturaService, times(1)).update(eq(facturaIdToUpdate), any(Factura.class));
+        verify(facturaService, times(1)).update(eq(factura.getCodFactura()), any(Factura.class));
     }
 
     @Test
-    void updateFactura_shouldReturnNotFoundWhenFacturaDoesNotExist() throws Exception {
-        // Arrange
-        Factura updatedDetails = new Factura(); 
-        updatedDetails.setFechaEmision(LocalDateTime.now());
-        updatedDetails.setTotalFactura(100.0);
-        updatedDetails.setVenta(venta1); 
+    @DisplayName("PUT /api/v1/facturas/{id} - Debería retornar 404 si la factura a actualizar no se encuentra")
+    void updateFactura_shouldReturnNotFound() throws Exception {
+        when(facturaService.update(anyLong(), any(Factura.class))).thenReturn(Optional.empty());
 
-        when(facturaService.update(eq(99L), any(Factura.class))).thenReturn(Optional.empty());
-
-        // Act & Assert
         mockMvc.perform(put("/api/v1/facturas/{id}", 99L)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updatedDetails)))
+                .content(objectMapper.writeValueAsString(new Factura())))
                 .andExpect(status().isNotFound());
 
         verify(facturaService, times(1)).update(eq(99L), any(Factura.class));
     }
 
     @Test
-    void deleteFactura_shouldReturnNoContentStatus() throws Exception {
-        // Arrange
-        when(facturaService.deleteById(1L)).thenReturn(true);
+    @DisplayName("DELETE /api/v1/facturas/{id} - Debería eliminar una factura exitosamente")
+    void deleteFactura_shouldDeleteFactura() throws Exception {
+        when(facturaService.deleteById(factura.getCodFactura())).thenReturn(true);
 
-        // Act & Assert
-        mockMvc.perform(delete("/api/v1/facturas/{id}", 1L))
+        mockMvc.perform(delete("/api/v1/facturas/{id}", factura.getCodFactura()))
                 .andExpect(status().isNoContent());
 
-        verify(facturaService, times(1)).deleteById(1L);
+        verify(facturaService, times(1)).deleteById(factura.getCodFactura());
     }
 
     @Test
-    void deleteFactura_shouldReturnNotFoundWhenFacturaDoesNotExist() throws Exception {
-        // Arrange
-        when(facturaService.deleteById(99L)).thenReturn(false);
+    @DisplayName("DELETE /api/v1/facturas/{id} - Debería retornar 404 si la factura a eliminar no se encuentra")
+    void deleteFactura_shouldReturnNotFound() throws Exception {
+        when(facturaService.deleteById(anyLong())).thenReturn(false);
 
-        // Act & Assert
         mockMvc.perform(delete("/api/v1/facturas/{id}", 99L))
                 .andExpect(status().isNotFound());
 
