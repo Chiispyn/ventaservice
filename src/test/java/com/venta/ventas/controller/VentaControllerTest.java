@@ -1,8 +1,7 @@
 package com.venta.ventas.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import com.venta.ventas.enums.EstadoVenta;
 import com.venta.ventas.enums.MedioEnvio;
 import com.venta.ventas.model.Cliente;
@@ -24,9 +23,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.hamcrest.Matchers.is;
+
 import static org.hamcrest.Matchers.hasSize; 
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*; 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -53,8 +52,7 @@ public class VentaControllerTest {
     @BeforeEach
     void setUp() {
 
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        
 
         testCliente = new Cliente(1L, "12345678-9", "Juan Perez", "juan@example.com", "Calle Falsa 123", "987654321", null);
         testProducto = new Producto(101L, "Laptop", 1200.0);
@@ -89,8 +87,8 @@ public class VentaControllerTest {
                     .content(objectMapper.writeValueAsString(newVenta))) 
             .andExpect(status().isCreated()) 
             .andExpect(jsonPath("$.medioEnvio").value("DESPACHO_A_DOMICILIO"))
-            .andExpect(jsonPath("$.estado").value("PENDIENTE"))
-            .andDo(print()); 
+            .andExpect(jsonPath("$.estado").value("PENDIENTE"));
+            
     verify(ventaService, times(1)).save(any(Venta.class), eq(newVenta.getCliente().getId()));
     }
 
@@ -102,8 +100,8 @@ public class VentaControllerTest {
         mockMvc.perform(get("/api/v1/ventas/{id}", testVenta.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(testVenta.getId().intValue()))
-                .andExpect(jsonPath("$.estado").value(EstadoVenta.PENDIENTE.toString()))
-                .andDo(print()); 
+                .andExpect(jsonPath("$.estado").value(EstadoVenta.PENDIENTE.toString()));
+                 
 
         verify(ventaService, times(1)).findById(testVenta.getId());
     }
@@ -117,9 +115,8 @@ public class VentaControllerTest {
         mockMvc.perform(get("/api/v1/ventas"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id").value(testVenta.getId().intValue()))
-                .andDo(print()); 
-
+                .andExpect(jsonPath("$[0].id").value(testVenta.getId().intValue()));
+                
         verify(ventaService, times(1)).findAll();
     }
 
@@ -145,8 +142,8 @@ public class VentaControllerTest {
         mockMvc.perform(put("/api/v1/ventas/{id}/descuento", testVenta.getId())
                         .param("porcentajeDescuento", "20.0")) 
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.montoTotal").value(4000.0))
-                .andDo(print()); 
+                .andExpect(jsonPath("$.montoTotal").value(4000.0));
+                
 
         verify(ventaService, times(1)).aplicarDescuento(eq(testVenta.getId()), eq(20.0));
     }
@@ -159,8 +156,8 @@ public class VentaControllerTest {
         when(ventaService.cancelarVenta(eq(testVenta.getId()))).thenReturn(Optional.of(cancelledVenta));
         mockMvc.perform(put("/api/v1/ventas/{id}/cancelar", testVenta.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estado").value(EstadoVenta.CANCELADA.toString()))
-                .andDo(print()); 
+                .andExpect(jsonPath("$.estado").value(EstadoVenta.CANCELADA.toString()));
+                
         verify(ventaService, times(1)).cancelarVenta(eq(testVenta.getId()));
     }
 
@@ -174,8 +171,8 @@ public class VentaControllerTest {
 
         mockMvc.perform(get("/api/v1/ventas/{id}/factura", testVenta.getId()))
                 .andExpect(status().isOk())
-                .andExpect(content().string(mockFacturaString))
-                .andDo(print()); 
+                .andExpect(content().string(mockFacturaString));
+
 
         verify(ventaService, times(1)).generarFactura(eq(testVenta.getId()));
     }
